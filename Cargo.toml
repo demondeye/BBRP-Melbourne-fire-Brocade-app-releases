@@ -1,0 +1,40 @@
+[package]
+name = "melbourne-fire-brigade"
+version = "0.1.0"
+edition = "2021"
+description = "Melbourne Fire Brigade — native Rust desktop app"
+build = "build.rs"
+
+[[bin]]
+name = "MelbourneFireBrigade"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { version = "0.31", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+egui_extras = { version = "0.31", features = ["svg", "image", "file"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+rand = "0.8"
+chrono = "0.4"
+dirs = "5"
+tiny_http = "0.12"
+ureq = { version = "2.12", features = ["json"] }
+rodio = { version = "0.19", default-features = false }
+arboard = { version = "3", default-features = false }
+rfd = { version = "0.15", default-features = false, features = ["xdg-portal", "tokio"] }
+
+raw-window-handle = "0.6"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging", "Win32_System_Threading", "Win32_Security"] }
+
+[build-dependencies]
+winresource = "0.1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
+codegen-units = 4
