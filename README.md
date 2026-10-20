@@ -28,13 +28,17 @@ logo and the Ember wallpaper by default.
   postal, or say **"Fire Com dispatch"** and the dispatcher answers *"Go for
   Dispatch"*. Say the postal ("three six one",
   "three sixty one", "ten twenty nine"); the map opens and flies there, and the
-  dispatcher reads it back with the nearest road ("Copy, postal three six
-  one… Palomino Avenue"). Say "cancel" to
-  stop. The phrase counts when said as its own command (at the start, or after
+  dispatcher reads it back with the nearest road, plus the corner or
+  intersection when the map shows one ("Copy, postal five two four. The
+  nearest road is Eclipse Boulevard. Intersection of Eclipse Boulevard and
+  Milton Road"; the corner / intersection part can be switched off in
+  Settings → Voice). Say "cancel" to
+  stop. After "Fire Com dispatch" or the listen key, say **"repeat that"**
+  instead of a postal to hear the last selected postal again (on its own it
+  does nothing, so roleplay talk can't set it off). The phrase counts when said as its own command (at the start, or after
   a short pause), not mid-sentence. Modes: Off / key only / key or phrase.
-  Pick the microphone and test it (level bar). Dispatcher voices: Ann (made
-  from a recording of Ann's own voice) plus 5 female and 5 male, and an
-  optional police-scanner radio effect.
+  Pick the microphone and test it (level bar). Dispatcher voices: 5 female and
+  5 male, and an optional police-scanner radio effect.
 - **Time Clock**, **Notes**, **Settings** — same as the ambulance app.
 - **Field Guide** — placeholder until the fire cheat sheet is written. (The
   ambulance guide code is still in `src/fieldguide/` to reuse its layout.)

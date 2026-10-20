@@ -354,6 +354,7 @@ pub fn show(ui: &mut Ui, st: &mut MapUi, voice: &crate::voice::VoiceStatus, sett
         if st.found_place.as_ref().is_none_or(|f| f.0 != i) {
             let (_, x, y) = POSTALS[i];
             st.found_place = Some((i, streets::describe(x, y)));
+            crate::voice::set_last_postal(POSTALS[i].0);
         }
     } else {
         st.found_place = None;

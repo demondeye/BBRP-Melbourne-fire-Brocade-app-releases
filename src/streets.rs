@@ -217,5 +217,15 @@ mod tests {
         for n in names {
             println!("STREET\t{n}");
         }
+        let mut crossing: Vec<String> = crate::postals::POSTALS.iter().filter_map(|&(_, x, y)| super::describe(x, y).and_then(|p| p.crossing)).flat_map(|c| c.streets).collect();
+        crossing.sort();
+        crossing.dedup();
+        for n in crossing {
+            println!("CROSS\t{n}");
+        }
+        let kinds: Vec<String> = crate::postals::POSTALS.iter().filter_map(|&(_, x, y)| super::describe(x, y)).map(|p| match &p.crossing { None => "none".to_string(), Some(c) => format!("{:?} main_in={}", c.kind, c.streets.contains(&p.street)) }).collect();
+        let mut counts = std::collections::BTreeMap::new();
+        for k in kinds { *counts.entry(k).or_insert(0) += 1; }
+        println!("KINDS\t{counts:?}");
     }
 }

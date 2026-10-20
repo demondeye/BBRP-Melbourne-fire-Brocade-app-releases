@@ -6,7 +6,9 @@
 //!   "Go for Dispatch" and you say the postal.
 //!
 //! The map then flies to that postal, and the dispatcher reads it back with its
-//! nearest road ("Copy, postal three six one… Palomino Avenue"). Nothing runs until a microphone is found.
+//! nearest road, plus the corner or intersection when the map shows one ("Copy,
+//! postal five two four. The nearest road is Eclipse Boulevard. Intersection of
+//! Eclipse Boulevard and Milton Road"). Nothing runs until a microphone is found.
 //!
 //! - Listening: the microphone picked in Settings (cpal), turned into words by the
 //!   Vosk speech engine, limited to the wake phrase and numbers so it's accurate.
@@ -14,8 +16,7 @@
 //! - The listen key: polled with GetAsyncKeyState, so any key or mouse button works
 //!   while another program (the game) has focus, and the key still reaches it.
 //! - The dispatcher: natural-sounding recordings made with the Kokoro neural voices,
-//!   plus "Ann", made from a recording of Ann's own voice (F5-TTS), built in
-//!   (`assets/voice/*.bin`), with an optional police-scanner radio effect.
+//!   built in (`assets/voice/*.bin`), with an optional police-scanner radio effect.
 
 use crate::core::{lock, Shared, UiEvent};
 use eframe::egui;
@@ -174,8 +175,7 @@ pub fn key_name(vk: u32) -> String {
 // ── The dispatcher's voice ───────────────────────────────────────────────
 
 /// The voices: (id, name shown in Settings, female?).
-pub const VOICES: [(&str, &str, bool); 11] = [
-    ("ann", "Ann", true),
+pub const VOICES: [(&str, &str, bool); 10] = [
     ("af_heart", "Heart (US)", true),
     ("af_bella", "Bella (US)", true),
     ("af_nicole", "Nicole (US)", true),
@@ -198,7 +198,7 @@ fn pack(voice: &str) -> &'static [u8] {
             }
         };
     }
-    packs!("ann", "af_heart", "af_bella", "af_nicole", "bf_emma", "bf_isabella", "am_fenrir", "am_michael", "am_puck", "bm_george", "bm_fable")
+    packs!("af_heart", "af_bella", "af_nicole", "bf_emma", "bf_isabella", "am_fenrir", "am_michael", "am_puck", "bm_george", "bm_fable")
 }
 
 fn clip(voice: &str, name: &str) -> &'static [u8] {
@@ -308,9 +308,10 @@ fn play(voice: &str, radio_fx: bool, names: &[&str], gap_ms: u64) {
         if i > 0 {
             all.extend(std::iter::repeat_n(0.0, (gap_ms as u32 * RATE / 1000) as usize));
         }
-        if *n == "_pause" {
-            // A breath before the road name.
-            all.extend(std::iter::repeat_n(0.0, (RATE / 4) as usize));
+        if *n == "_pause" || *n == "_beat" {
+            // A breath after the postal, and a beat before the road name.
+            let secs = if *n == "_pause" { 0.25 } else { 0.08 };
+            all.extend(std::iter::repeat_n(0.0, (RATE as f32 * secs) as usize));
             continue;
         }
         all.extend(samples(voice, n));
@@ -350,8 +351,11 @@ pub fn play_sample(voice: &str, radio_fx: bool) {
     std::thread::spawn(move || play(&v, radio_fx, &["greet"], 0));
 }
 
-/// Say the postal back, with its nearest road: "Copy, postal three six one… Palomino Avenue."
-fn read_back(voice: &str, radio_fx: bool, code: &str) {
+/// Say the postal back with its nearest road, and the corner or intersection
+/// when the map shows one (same words as the box on the map):
+/// "Copy, postal five two four. The nearest road is Eclipse Boulevard.
+///  Intersection of Eclipse Boulevard and Milton Road."
+fn read_back(voice: &str, radio_fx: bool, crossing: bool, code: &str) {
     let mut names: Vec<String> = vec!["copy".into()];
     names.extend(code.chars().filter(|c| c.is_ascii_digit()).map(|c| format!("d{c}")));
     if let Some(&(_, x, y)) = crate::postals::POSTALS.iter().find(|p| p.0 == code) {
@@ -359,7 +363,20 @@ fn read_back(voice: &str, radio_fx: bool, code: &str) {
             let clip_name = format!("s/{}", place.street);
             if !clip(voice, &clip_name).is_empty() {
                 names.push("_pause".into());
+                names.push("nearest".into());
+                names.push("_beat".into());
                 names.push(clip_name);
+                if let Some(c) = place.crossing.as_ref().filter(|_| crossing) {
+                    let kind = match c.kind {
+                        crate::streets::Kind::Intersection => "k_intersection",
+                        crate::streets::Kind::TIntersection => "k_t",
+                        crate::streets::Kind::Corner => "k_corner",
+                    };
+                    let (a, b) = (format!("s/{}", c.streets[0]), format!("s/{}", c.streets[1]));
+                    if !clip(voice, &a).is_empty() && !clip(voice, &b).is_empty() {
+                        names.extend(["_pause".into(), kind.into(), "_beat".into(), a, "_beat".into(), "and".into(), "_beat".into(), b]);
+                    }
+                }
             }
         }
     }
@@ -478,7 +495,7 @@ fn wake_grammar() -> String {
 }
 
 fn postal_grammar() -> String {
-    let words = "zero oh one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty thirty forty fifty sixty seventy eighty ninety hundred thousand and postal go to cancel never mind disregard";
+    let words = "zero oh one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty thirty forty fifty sixty seventy eighty ninety hundred thousand and postal go to cancel never mind disregard repeat that";
     let mut g: Vec<&str> = words.split(' ').collect();
     g.push("[unk]");
     serde_json::to_string(&g).unwrap()
@@ -668,7 +685,9 @@ fn json_words(ptr: *const std::ffi::c_char, field: &str) -> Vec<(String, f32, f3
 }
 
 impl Rec<'_> {
-    /// Feed audio and check for the wake phrase as it's being said.
+    /// Feed audio and check for the wake phrase as it's being said. (Every other
+    /// command, like "repeat that", only counts after the wake phrase or the key,
+    /// so it can't go off by accident while roleplaying.)
     fn feed_wake(&mut self, pcm: &[i16]) -> bool {
         let ended = self.feed(pcm);
         let raw = if ended { unsafe { (self.v.result)(self.p) } } else { unsafe { (self.v.partial)(self.p) } };
@@ -792,7 +811,11 @@ pub fn start(core: Shared, ctx: egui::Context) {
 }
 
 /// What to do once something was heard as a postal. Some(true) = done.
-fn handle_heard(core: &Shared, ctx: &egui::Context, voice: &str, radio_fx: bool, readback: bool, text: &str) -> Option<bool> {
+fn handle_heard(core: &Shared, ctx: &egui::Context, voice: &str, radio_fx: bool, readback: bool, crossing: bool, text: &str) -> Option<bool> {
+    if text.contains("repeat") {
+        repeat_last(core, ctx, voice, radio_fx, crossing);
+        return Some(true);
+    }
     if is_cancel(text) {
         lock(core).voice.heard = Some(format!("“{text}” — cancelled"));
         ctx.request_repaint();
@@ -801,6 +824,7 @@ fn handle_heard(core: &Shared, ctx: &egui::Context, voice: &str, radio_fx: bool,
     }
     match parse_postal(text) {
         Some(code) if postal_exists(&code) => {
+            set_last_postal(&code);
             {
                 let mut c = lock(core);
                 c.voice.heard = Some(format!("“{text}” → postal {code}"));
@@ -808,7 +832,7 @@ fn handle_heard(core: &Shared, ctx: &egui::Context, voice: &str, radio_fx: bool,
             }
             ctx.request_repaint();
             if readback {
-                read_back(voice, radio_fx, &code);
+                read_back(voice, radio_fx, crossing, &code);
             }
             Some(true)
         }
@@ -828,6 +852,7 @@ struct Snapshot {
     voice: String,
     radio: bool,
     readback: bool,
+    crossing: bool,
     key: u32,
     mic: String,
 }
@@ -840,6 +865,7 @@ fn snapshot(core: &Shared) -> Snapshot {
         voice: c.settings.voice_name.clone(),
         radio: c.settings.voice_radio,
         readback: c.settings.voice_readback,
+        crossing: c.settings.voice_crossing,
         key: c.settings.voice_key,
         mic: c.settings.voice_mic.clone(),
     }
@@ -885,7 +911,7 @@ fn take_postal(core: &Shared, ctx: &egui::Context, vosk: &Vosk, mic: &Mic, s: &S
         let heard = listen_once(mic, &mut rec);
         set_state(core, ctx, VoiceState::Speaking);
         match heard {
-            Some(text) => match handle_heard(core, ctx, &s.voice, s.radio, s.readback, &text) {
+            Some(text) => match handle_heard(core, ctx, &s.voice, s.radio, s.readback, s.crossing, &text) {
                 Some(true) => break,
                 Some(false) => {}
                 None => {
@@ -922,6 +948,31 @@ fn is_wake_words(words: &[(String, f32, f32)]) -> bool {
         }
     }
     false
+}
+
+/// The last postal the map went to (by voice, search or a click), for "repeat that".
+static LAST_POSTAL: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// The map: this postal is now selected.
+pub fn set_last_postal(code: &str) {
+    *LAST_POSTAL.lock().unwrap_or_else(|e| e.into_inner()) = Some(code.to_string());
+}
+
+/// Say the last postal again (and show it on the map).
+fn repeat_last(core: &Shared, ctx: &egui::Context, voice: &str, radio_fx: bool, crossing: bool) {
+    let last = LAST_POSTAL.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    match last {
+        Some(code) => {
+            {
+                let mut c = lock(core);
+                c.voice.heard = Some(format!("“repeat that” → postal {code}"));
+                c.events.push(UiEvent::MapPostal(code.clone()));
+            }
+            ctx.request_repaint();
+            read_back(voice, radio_fx, crossing, &code);
+        }
+        None => play(voice, radio_fx, &["nothing_repeat"], 0),
+    }
 }
 
 fn engine(core: Shared, ctx: egui::Context) {
@@ -1115,6 +1166,13 @@ mod tests {
         // In the middle of a sentence it doesn't count.
         let mut r = v.recognizer(&wake);
         assert!(!read("fire mid sentence").chunks(1600).any(|c| r.feed_wake(c)), "mid-sentence");
+        // "Repeat that" on its own does nothing (roleplay talk)...
+        for name in ["repeat that", "can you repeat that"] {
+            let mut r = v.recognizer(&wake);
+            assert!(!read(name).chunks(1600).any(|c| r.feed_wake(c)), "{name} on its own");
+        }
+        // ...it only works after the wake phrase or the key, when listening for a postal.
+        assert_eq!(run(&post, &read("repeat that")), "repeat that");
         assert_eq!(run(&wake, &read("chatter")), "");
         for (name, code) in [("three six one", "361"), ("three sixty one", "361"), ("ten twenty nine", "1029"), ("postal one two five", "125")] {
             let t = run(&post, &read(name));
@@ -1134,10 +1192,13 @@ mod tests {
         super::Vosk::load(&dir).expect("loads after download");
     }
 
-    /// Every postal's nearest road can be said in every voice.
+    /// Every postal's nearest road, and the roads of its corner or intersection,
+    /// can be said in every voice.
     #[test]
     fn every_road_is_recorded() {
-        let mut roads: Vec<String> = crate::postals::POSTALS.iter().filter_map(|&(_, x, y)| crate::streets::describe(x, y).map(|p| p.street)).collect();
+        let places: Vec<crate::streets::Place> = crate::postals::POSTALS.iter().filter_map(|&(_, x, y)| crate::streets::describe(x, y)).collect();
+        let mut roads: Vec<String> = places.iter().map(|p| p.street.clone()).collect();
+        roads.extend(places.iter().filter_map(|p| p.crossing.as_ref()).flat_map(|c| c.streets.clone()));
         roads.sort();
         roads.dedup();
         for (v, _, _) in super::VOICES {
@@ -1149,7 +1210,7 @@ mod tests {
     #[test]
     fn voices_and_radio() {
         for (v, _, _) in super::VOICES {
-            for n in ["greet", "copy", "say_again", "not_found", "cancel", "no_hear", "d0", "d9"] {
+            for n in ["greet", "copy", "nothing_repeat", "nearest", "k_intersection", "k_t", "k_corner", "and", "say_again", "not_found", "cancel", "no_hear", "d0", "d9"] {
                 assert!(!super::samples(v, n).is_empty(), "{v} {n}");
             }
         }

@@ -752,7 +752,7 @@ fn voice_pane(ui: &mut Ui, core: &mut Core) {
         });
     });
     group(ui, Some("Dispatcher"), |ui| {
-        row(ui, true, "Voice", Some("Ann, plus five female and five male voices."), |ui| {
+        row(ui, true, "Voice", Some("Five female and five male voices."), |ui| {
             if mac_button(ui, "Play") {
                 voice::play_sample(&s.voice_name, s.voice_radio);
             }
@@ -774,8 +774,11 @@ fn voice_pane(ui: &mut Ui, core: &mut Core) {
                 voice::play_sample(&s.voice_name, s.voice_radio);
             }
         });
-        row(ui, false, "Read the postal back", Some("“Copy, postal three six one… Palomino Avenue.”"), |ui| {
+        row(ui, false, "Read the postal back", Some("“Copy, postal 524. The nearest road is Eclipse Blvd. Intersection of Eclipse Blvd and Milton Rd.”"), |ui| {
             ui.checkbox(&mut s.voice_readback, "");
+        });
+        row(ui, false, "Call out corners and intersections", Some("Adds “Intersection of Eclipse Blvd and Milton Rd” when the map shows one."), |ui| {
+            ui.add_enabled(s.voice_readback, egui::Checkbox::without_text(&mut s.voice_crossing));
         });
     });
     if s != before {
@@ -803,7 +806,7 @@ fn voice_pane(ui: &mut Ui, core: &mut Core) {
     }
     ui.add_space(4.0);
     note(ui, "Say “Fire Com dispatch” as its own command (take a short breath before it if you've been talking) — it won't go off in the middle of a sentence.");
-    note(ui, "Say the postal the way you'd read it: “three six one”, “three sixty one” or “ten twenty nine”. Say “cancel” to stop. Speech is understood on this PC; the speech engine (about 56 MB) downloads once, the first time. If the level bar doesn't move when you talk, pick another microphone, or check Windows Settings › Privacy & security › Microphone and turn on “Let desktop apps access your microphone”.");
+    note(ui, "Say the postal the way you'd read it: “three six one”, “three sixty one” or “ten twenty nine”. Say “cancel” to stop. Say “repeat that” instead of a postal (after “Fire Com dispatch” or the key) to hear the last postal again. Speech is understood on this PC; the speech engine (about 56 MB) downloads once, the first time. If the level bar doesn't move when you talk, pick another microphone, or check Windows Settings › Privacy & security › Microphone and turn on “Let desktop apps access your microphone”.");
 }
 
 fn account_pane(ui: &mut Ui, name: &str) {

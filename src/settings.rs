@@ -47,6 +47,9 @@ pub struct UserSettings {
     /// Say the postal back ("Copy, postal 3 6 1") after going to it.
     #[serde(rename = "voiceReadback")]
     pub voice_readback: bool,
+    /// In the read-back, also say the corner or intersection (when the map shows one).
+    #[serde(rename = "voiceCrossing")]
+    pub voice_crossing: bool,
 }
 
 impl Default for Wallpaper {
@@ -56,7 +59,7 @@ impl Default for Wallpaper {
 }
 impl Default for UserSettings {
     fn default() -> Self {
-        Self { wallpaper: Wallpaper::default(), custom_image: None, fit: "fill".into(), fill_color: [30, 10, 11], appearance: "dark".into(), voice_mode: "both".into(), voice_name: "af_heart".into(), voice_radio: false, voice_mic: String::new(), voice_key: 0x79, voice_readback: true }
+        Self { wallpaper: Wallpaper::default(), custom_image: None, fit: "fill".into(), fill_color: [30, 10, 11], appearance: "dark".into(), voice_mode: "both".into(), voice_name: "af_heart".into(), voice_radio: false, voice_mic: String::new(), voice_key: 0x79, voice_readback: true, voice_crossing: true }
     }
 }
 
