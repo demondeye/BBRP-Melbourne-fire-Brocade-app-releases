@@ -10,6 +10,8 @@ use std::sync::{Arc, Mutex};
 pub enum UiEvent {
     OpenApp(&'static str),
     Toast(String),
+    /// Voice control heard a postal: open the map and go there.
+    MapPostal(String),
 }
 
 #[derive(Clone, PartialEq)]
@@ -33,6 +35,8 @@ pub struct Core {
     pub update_dismissed: Option<String>,
     /// Asked for from the screen; carried out by the app once the screen is drawn.
     pub update_request: Option<UpdateRequest>,
+    /// What voice control is doing (shown on the map and in Settings).
+    pub voice: crate::voice::VoiceStatus,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -56,6 +60,7 @@ impl Core {
             update_checked_at: None,
             update_dismissed: None,
             update_request: None,
+            voice: crate::voice::VoiceStatus::default(),
         }))
     }
 

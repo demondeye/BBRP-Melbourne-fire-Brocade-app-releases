@@ -69,6 +69,7 @@ impl App {
         theme::install_fonts(&cc.egui_ctx);
         theme::install_style(&cc.egui_ctx);
         crate::relay::start(core.clone(), cc.egui_ctx.clone());
+        crate::voice::start(core.clone(), cc.egui_ctx.clone());
         crate::update::cleanup();
         crate::update::start_background_checks(core.clone(), cc.egui_ctx.clone());
         // A desktop app may always play sound, so it starts straight away.

@@ -28,6 +28,25 @@ pub struct UserSettings {
     pub fill_color: [u8; 3],
     /// Window look: "dark", "light" or "auto" (follow Windows).
     pub appearance: String,
+    /// Voice control: "off", "key" (listen while the key is pressed) or "both"
+    /// (the key, or saying "Fire Com dispatch").
+    #[serde(rename = "voiceMode")]
+    pub voice_mode: String,
+    /// The dispatcher's voice (one of `voice::VOICES`, e.g. "af_heart").
+    #[serde(rename = "voiceName")]
+    pub voice_name: String,
+    /// Make the dispatcher sound like a police-scanner radio.
+    #[serde(rename = "voiceRadio")]
+    pub voice_radio: bool,
+    /// The microphone to listen with (its name; empty = the Windows default).
+    #[serde(rename = "voiceMic")]
+    pub voice_mic: String,
+    /// The listen key (a Windows virtual-key code; 4/5/6 are the middle and side mouse buttons).
+    #[serde(rename = "voiceKey")]
+    pub voice_key: u32,
+    /// Say the postal back ("Copy, postal 3 6 1") after going to it.
+    #[serde(rename = "voiceReadback")]
+    pub voice_readback: bool,
 }
 
 impl Default for Wallpaper {
@@ -37,7 +56,7 @@ impl Default for Wallpaper {
 }
 impl Default for UserSettings {
     fn default() -> Self {
-        Self { wallpaper: Wallpaper::default(), custom_image: None, fit: "fill".into(), fill_color: [13, 27, 46], appearance: "dark".into() }
+        Self { wallpaper: Wallpaper::default(), custom_image: None, fit: "fill".into(), fill_color: [30, 10, 11], appearance: "dark".into(), voice_mode: "both".into(), voice_name: "af_heart".into(), voice_radio: false, voice_mic: String::new(), voice_key: 0x79, voice_readback: true }
     }
 }
 

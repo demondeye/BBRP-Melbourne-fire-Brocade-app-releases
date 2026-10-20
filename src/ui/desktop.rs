@@ -111,6 +111,10 @@ impl Desktop {
             match event {
                 UiEvent::OpenApp(id) => self.open(id, area, now),
                 UiEvent::Toast(text) => self.toast = Some((text, now)),
+                UiEvent::MapPostal(code) => {
+                    self.open("map", area, now);
+                    self.apps.map.go_code(&code, now);
+                }
             }
         }
         // The Field Guide always starts fresh: closing its window clears every

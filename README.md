@@ -23,6 +23,18 @@ logo and the Ember wallpaper by default.
   apart a 4-way **Intersection**, a **T-intersection** and a **Corner**.
   Right-click drops a waypoint and gets the same street details. Satellite /
   Atlas switch, and a button to hide the postals.
+- **Voice control** (Settings → Voice) — press the listen key (default F10,
+  works while the game has focus; a mouse side button works too) and say a
+  postal, or say **"Fire Com dispatch"** and the dispatcher answers *"Go for
+  Dispatch"*. Say the postal ("three six one",
+  "three sixty one", "ten twenty nine"); the map opens and flies there, and the
+  dispatcher reads it back with the nearest road ("Copy, postal three six
+  one… Palomino Avenue"). Say "cancel" to
+  stop. The phrase counts when said as its own command (at the start, or after
+  a short pause), not mid-sentence. Modes: Off / key only / key or phrase.
+  Pick the microphone and test it (level bar). Dispatcher voices: Ann (made
+  from a recording of Ann's own voice) plus 5 female and 5 male, and an
+  optional police-scanner radio effect.
 - **Time Clock**, **Notes**, **Settings** — same as the ambulance app.
 - **Field Guide** — placeholder until the fire cheat sheet is written. (The
   ambulance guide code is still in `src/fieldguide/` to reuse its layout.)
@@ -45,6 +57,16 @@ Street names come from the game's own road network (every named road point,
 from github.com/DurtyFree/gta-v-data-dumps), lined up with the map pictures
 and packed in `assets/map/roads.bin`. `src/streets.rs` works out the street
 and the corner / intersection.
+
+Voice control (`src/voice.rs`) only switches on once a microphone is found.
+It listens on the microphone picked in Settings → Voice (with a live level bar)
+and understands speech on this PC with the Vosk engine, limited to the wake
+phrase and numbers. The engine (~56 MB) is downloaded once, the first time
+voice control is on, into `%APPDATA%\Melbourne Fire Brigade\speech\`
+(delete that folder to get it again). The listen key is watched with
+GetAsyncKeyState, so any key or mouse button works while the game has focus,
+and the key still reaches the game. The dispatcher voices are recordings made
+with the open Kokoro neural voices, packed in `assets/voice/*.bin`.
 
 The map pictures (`assets/map/*-z*.bin`) are the satellite and atlas tiles from
 github.com/meesvrh/GTAV-Map-Tiles, packed so they're built into the exe. That
@@ -102,6 +124,7 @@ src/main.rs            window setup
 src/app.rs             boot → login → desktop, restart / shut down
 src/postals.rs         every postal and where it sits on the map
 src/streets.rs         nearest street, corner or intersection for any spot
+src/voice.rs           voice control: listen key, wake phrase, dispatcher voice
 src/ui/apps/map.rs     the Map app
 src/core.rs            state shared with the Stream Deck server
 src/relay.rs           Stream Deck control API (localhost:47914)

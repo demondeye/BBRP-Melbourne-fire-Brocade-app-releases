@@ -202,3 +202,20 @@ pub fn nearest_street(x: f32, y: f32) -> Option<&'static str> {
     };
     Some(r.streets[pick.0 as usize].name.as_str())
 }
+
+#[cfg(test)]
+mod tests {
+    /// Prints the nearest street of every postal (MFB_LIST_STREETS=1).
+    #[test]
+    fn list_postal_streets() {
+        if std::env::var("MFB_LIST_STREETS").is_err() {
+            return;
+        }
+        let mut names: Vec<String> = crate::postals::POSTALS.iter().filter_map(|&(_, x, y)| super::describe(x, y).map(|p| p.street)).collect();
+        names.sort();
+        names.dedup();
+        for n in names {
+            println!("STREET\t{n}");
+        }
+    }
+}

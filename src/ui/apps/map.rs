@@ -152,6 +152,13 @@ impl MapUi {
         self.flight = None;
     }
 
+    /// Go to a postal from outside (voice control).
+    pub fn go_code(&mut self, code: &str, now: f64) {
+        self.search = code.to_string();
+        self.found = None;
+        self.go_to_postal(now);
+    }
+
     fn go_to_postal(&mut self, now: f64) {
         let code = self.search.trim().to_string();
         self.message = None;
@@ -238,7 +245,7 @@ impl MapUi {
     }
 }
 
-pub fn show(ui: &mut Ui, st: &mut MapUi, now: f64, radius: u8) {
+pub fn show(ui: &mut Ui, st: &mut MapUi, voice: &crate::voice::VoiceStatus, settings: &crate::settings::UserSettings, now: f64, radius: u8) {
     st.frame += 1;
     let view = ui.max_rect();
     let resp = ui.allocate_rect(view, Sense::click_and_drag());
@@ -428,6 +435,43 @@ pub fn show(ui: &mut Ui, st: &mut MapUi, now: f64, radius: u8) {
         let box_r = Rect::from_min_size(r.min, Vec2::new(search_w, g.size().y + 16.0));
         painter.rect_filled(box_r, CornerRadius::same(12), fade(Color32::from_rgb(0x2e, 0x0b, 0x0d), 0.92));
         painter.galley(box_r.min + Vec2::new(12.0, 8.0), g, WHITE);
+    }
+
+    // Voice control status, under the search box.
+    {
+        use crate::voice::VoiceState;
+        let key = crate::voice::key_name(settings.voice_key);
+        let red = Color32::from_rgb(0xe0, 0x2b, 0x20);
+        let (dot, text): (Option<Color32>, String) = match &voice.state {
+            VoiceState::Off => (None, String::new()),
+            VoiceState::NoMic => (Some(white(0.4)), "Voice off — no microphone detected".into()),
+            VoiceState::Downloading(p) => (Some(white(0.5)), format!("Getting voice control ready… {}%", (p * 100.0) as u32)),
+            VoiceState::Waiting if settings.voice_mode == "both" => (Some(white(0.5)), format!("Say “Fire Com dispatch” or press {key}")),
+            VoiceState::Waiting => (Some(white(0.5)), format!("Press {key} and say a postal")),
+            VoiceState::Listening => (Some(red), "Listening for a postal…".into()),
+            VoiceState::Speaking => (Some(Color32::from_rgb(0xff, 0xd2, 0x4a)), "Dispatch".into()),
+            VoiceState::Problem(e) => (Some(red), format!("Voice: {e}")),
+        };
+        if let Some(dot) = dot {
+            let mut text = text;
+            if let Some(h) = &voice.heard {
+                if !matches!(voice.state, VoiceState::Problem(_)) {
+                    text = format!("{text}\nHeard {h}");
+                }
+            }
+            let top = bar.bottom() + if st.message.is_some() { 70.0 } else { 10.0 };
+            let g = painter.layout(text, font(12.5, 500), WHITE, search_w - 40.0);
+            let r = Rect::from_min_size(Pos2::new(bar.left(), top), Vec2::new(g.size().x + 40.0, g.size().y + 14.0));
+            painter.rect_filled(r, CornerRadius::same(12), fade(Color32::from_rgb(0x14, 0x06, 0x07), 0.85));
+            let pulse = if voice.state == VoiceState::Listening {
+                ui.ctx().request_repaint();
+                0.6 + 0.4 * ((now * 6.0).sin() as f32 * 0.5 + 0.5)
+            } else {
+                1.0
+            };
+            painter.circle_filled(Pos2::new(r.left() + 16.0, r.top() + 14.0), 5.0, fade(dot, pulse));
+            painter.galley(Pos2::new(r.left() + 30.0, r.top() + 7.0), g, WHITE);
+        }
     }
 
     // Layer switch, top right (below the search on narrow windows).

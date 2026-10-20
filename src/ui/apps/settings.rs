@@ -48,11 +48,12 @@ struct Section {
 }
 
 // Add a settings section: write a pane function, add a line here and to `pane()`.
-const SECTIONS: [Section; 6] = [
+const SECTIONS: [Section; 7] = [
     Section { name: "Account", tint: [0x5a, 0x6b, 0x85], icon: icons::ACCOUNT, keywords: "name user password local", group: 0 },
     Section { name: "Appearance", tint: [0x1d, 0x1d, 0x1f], icon: r#"<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="white"/>"#, keywords: "dark light mode theme auto window windowed borderless fullscreen full screen display monitor screen", group: 1 },
     Section { name: "Wallpaper", tint: [0x2e, 0x7a, 0xb5], icon: icons::WALLPAPER, keywords: "background picture photo desktop fill fit stretch centre center tile colour color", group: 1 },
     Section { name: "Stream Deck", tint: [0x1f, 0x8a, 0x6c], icon: icons::STREAMDECK, keywords: "plugin keys address control connection", group: 2 },
+    Section { name: "Voice", tint: [0xc8, 0x28, 0x1e], icon: r#"<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>"#, keywords: "voice speech microphone mic key bind keybind dispatch fire com talk listen postal male female radio gta scanner", group: 2 },
     Section { name: "Software Update", tint: [0x6b, 0x6b, 0x70], icon: icons::UPDATE, keywords: "update version install new", group: 3 },
     Section { name: "About", tint: [0x1d, 0x0f, 0x5e], icon: r#"<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>"#, keywords: "version info", group: 3 },
 ];
@@ -60,7 +61,8 @@ const SECTIONS: [Section; 6] = [
 pub const ACCOUNT_SECTION: usize = 0;
 pub const WALLPAPER_SECTION: usize = 2;
 /// The Software Update section's place in the list.
-pub const UPDATE_SECTION: usize = 4;
+pub const UPDATE_SECTION: usize = 5;
+pub const VOICE_SECTION: usize = 4;
 
 const TOOLBAR_H: f32 = 52.0;
 
@@ -130,6 +132,7 @@ pub fn show(ui: &mut Ui, st: &mut SettingsUi, core: &mut Core, now: f64, radius:
                 1 => appearance_pane(ui, core),
                 WALLPAPER_SECTION => wallpaper_pane(ui, st, core, &name),
                 3 => streamdeck_pane(ui, st, core, now),
+                VOICE_SECTION => voice_pane(ui, core),
                 UPDATE_SECTION => update_pane(ui, core),
                 _ => about_pane(ui),
             }
@@ -658,6 +661,149 @@ fn streamdeck_pane(ui: &mut Ui, st: &mut SettingsUi, core: &mut Core, now: f64) 
             });
         }
     });
+}
+
+// ── Voice ─────────────────────────────────────────────────────────────────
+
+fn voice_pane(ui: &mut Ui, core: &mut Core) {
+    use crate::voice::{self, VoiceState, VOICES};
+    ui.add(egui::Label::new(RichText::new("Talk to the map. Press your listen key and say a postal, or say “Fire Com dispatch” and the dispatcher answers “Go for Dispatch”. The map opens and goes to the postal, and the dispatcher reads it back with the nearest road. Works while you're in game.").font(font(14.0, 400)).color(white(0.75))).wrap());
+
+    // A key picked in "Change…" arrives from the keyboard hook.
+    if let Some(vk) = voice::take_captured() {
+        let mut s = core.settings.clone();
+        s.voice_key = vk;
+        core.save_settings(s);
+    }
+    let mut s = core.settings.clone();
+    let before = s.clone();
+    let modes = [("off", "Off"), ("key", "Listen key only"), ("both", "Listen key or “Fire Com dispatch”")];
+    group(ui, Some("Microphone"), |ui| {
+        row(ui, true, "Microphone", None, |ui| {
+            let label = if s.voice_mic.is_empty() { "Windows default".to_string() } else { s.voice_mic.clone() };
+            egui::ComboBox::from_id_salt("voice-mic").selected_text(theme::elide(ui, &label, &font(13.0, 400), 230.0)).width(250.0).show_ui(ui, |ui| {
+                if ui.selectable_label(s.voice_mic.is_empty(), "Windows default").clicked() {
+                    s.voice_mic.clear();
+                }
+                for m in &core.voice.mics {
+                    if ui.selectable_label(&s.voice_mic == m, m).clicked() {
+                        s.voice_mic = m.clone();
+                    }
+                }
+            });
+        });
+        // Level bar, only while testing, so you can see it hears you.
+        let in_use = core.voice.mic_in_use.clone();
+        let testing = voice::testing();
+        let sub = match (&in_use, testing) {
+            (Some(n), true) => format!("Talk now — using: {n}"),
+            (None, true) => "Looking for the microphone…".to_string(),
+            (_, false) => "Check the app can hear you.".to_string(),
+        };
+        row(ui, false, "Test microphone", Some(&sub), |ui| {
+            if testing {
+                if mac_button(ui, "Stop") {
+                    voice::set_testing(false);
+                }
+                ui.ctx().request_repaint_after(std::time::Duration::from_millis(50));
+                let (r, _) = ui.allocate_exact_size(Vec2::new(120.0, 8.0), Sense::hover());
+                ui.painter().rect_filled(r, 4.0, white(0.15));
+                let lv = if in_use.is_some() { (voice::level() * 1.6).min(1.0) } else { 0.0 };
+                let color = if lv > 0.9 { Color32::from_rgb(0xe0, 0x2b, 0x20) } else { green() };
+                ui.painter().rect_filled(Rect::from_min_size(r.min, Vec2::new(r.width() * lv, r.height())), 4.0, color);
+            } else if mac_button(ui, "Test") {
+                voice::set_testing(true);
+            }
+        });
+    });
+    if core.voice.state == VoiceState::NoMic {
+        note(ui, "Plug in a microphone. Voice control stays off until one is found; the map still works as normal.");
+    } else {
+        note(ui, "Press Test and talk: the bar should move. If it doesn't, pick another microphone.");
+    }
+    group(ui, Some("Voice control"), |ui| {
+        row(ui, true, "Listen with", None, |ui| {
+            let label = modes.iter().find(|m| m.0 == s.voice_mode).map_or("Off", |m| m.1);
+            egui::ComboBox::from_id_salt("voice-mode").selected_text(label).width(250.0).show_ui(ui, |ui| {
+                for (id, name) in modes {
+                    if ui.selectable_label(s.voice_mode == id, name).clicked() {
+                        s.voice_mode = id.to_string();
+                    }
+                }
+            });
+        });
+        row(ui, false, "Listen key", Some("Press it, then say the postal. A key or a mouse side button."), |ui| {
+            if voice::capturing() {
+                ui.ctx().request_repaint();
+                if mac_button(ui, "Cancel") {
+                    voice::cancel_capture();
+                }
+                ui.label(RichText::new("Press a key or mouse button…").font(font(13.0, 600)).color(ice_text()));
+            } else {
+                if mac_button(ui, "Change…") {
+                    voice::start_capture();
+                }
+                ui.label(RichText::new(voice::key_name(s.voice_key)).font(font(13.5, 600)));
+                if voice::key_pressed_recently(1500) {
+                    ui.label(RichText::new("✓ pressed").font(font(12.5, 600)).color(green()));
+                }
+                ui.ctx().request_repaint_after(std::time::Duration::from_millis(100));
+            }
+        });
+    });
+    group(ui, Some("Dispatcher"), |ui| {
+        row(ui, true, "Voice", Some("Ann, plus five female and five male voices."), |ui| {
+            if mac_button(ui, "Play") {
+                voice::play_sample(&s.voice_name, s.voice_radio);
+            }
+            let label = VOICES.iter().find(|v| v.0 == s.voice_name).map_or("Heart (US)", |v| v.1);
+            egui::ComboBox::from_id_salt("voice-name").selected_text(label).width(150.0).show_ui(ui, |ui| {
+                for female in [true, false] {
+                    ui.label(RichText::new(if female { "Female" } else { "Male" }).font(font(12.0, 600)).color(white(0.55)));
+                    for (id, name, f) in VOICES {
+                        if f == female && ui.selectable_label(s.voice_name == id, name).clicked() {
+                            s.voice_name = id.to_string();
+                            voice::play_sample(id, s.voice_radio);
+                        }
+                    }
+                }
+            });
+        });
+        row(ui, false, "Radio effect", Some("Sounds like a police-scanner dispatcher, GTA style."), |ui| {
+            if ui.checkbox(&mut s.voice_radio, "").changed() {
+                voice::play_sample(&s.voice_name, s.voice_radio);
+            }
+        });
+        row(ui, false, "Read the postal back", Some("“Copy, postal three six one… Palomino Avenue.”"), |ui| {
+            ui.checkbox(&mut s.voice_readback, "");
+        });
+    });
+    if s != before {
+        core.save_settings(s);
+    }
+
+    section_header(ui, "Status");
+    let key = voice::key_name(core.settings.voice_key);
+    let (title, ok) = match &core.voice.state {
+        VoiceState::Off => ("Voice control is off".to_string(), false),
+        VoiceState::NoMic => ("No microphone detected — voice control is waiting for one".to_string(), false),
+        VoiceState::Downloading(p) => (format!("Getting the speech engine (first time only)… {}%", (p * 100.0) as u32), true),
+        VoiceState::Waiting if core.settings.voice_mode == "both" => (format!("Ready — press {key} or say “Fire Com dispatch”"), true),
+        VoiceState::Waiting => (format!("Ready — press {key}"), true),
+        VoiceState::Listening => ("Listening for a postal…".to_string(), true),
+        VoiceState::Speaking => ("Dispatcher talking".to_string(), true),
+        VoiceState::Problem(_) => ("Not working".to_string(), false),
+    };
+    status_line(ui, &title, ok);
+    if let VoiceState::Problem(e) = &core.voice.state {
+        ui.add(egui::Label::new(RichText::new(e).font(font(13.0, 400)).color(red_text())).wrap());
+    }
+    if let Some(h) = &core.voice.heard {
+        note(ui, &format!("Last heard: {h}"));
+    }
+    ui.add_space(4.0);
+    note(ui, "Say “Fire Com dispatch” as its own command (take a short breath before it if you've been talking) — it won't go off in the middle of a sentence.");
+    note(ui, "Say the postal the way you'd read it: “three six one”, “three sixty one” or “ten twenty nine”. Say “cancel” to stop. Speech is understood on this PC; the speech engine (about 56 MB) downloads once, the first time. If the level bar doesn't move when you talk, pick another microphone, or check Windows Settings › Privacy & security › Microphone and turn on “Let desktop apps access your microphone”.");
 }
 
 fn account_pane(ui: &mut Ui, name: &str) {

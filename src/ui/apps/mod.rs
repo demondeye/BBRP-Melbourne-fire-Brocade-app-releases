@@ -55,7 +55,7 @@ pub fn show_app(ui: &mut Ui, id: &str, apps: &mut Apps, core: &mut Core, confirm
         "timeclock" => timeclock::show(ui, &mut apps.timeclock, core, confirm, now),
         // The fire Field Guide is waiting for its content; the ambulance one stays in the code for now.
         "fieldguide" => placeholders::fieldguide(ui),
-        "map" => map::show(ui, &mut apps.map, now, radius),
+        "map" => map::show(ui, &mut apps.map, &core.voice, &core.settings, now, radius),
         "settings" => settings::show(ui, &mut apps.settings, core, now, radius),
         "records" => placeholders::records(ui),
         "notes" => placeholders::notes(ui, &mut apps.notes),

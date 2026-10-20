@@ -18,6 +18,7 @@ mod streets;
 mod timeclock;
 mod ui;
 mod update;
+mod voice;
 
 fn main() -> eframe::Result {
     // Already open? Bring that window forward and stop here.
